@@ -47,7 +47,7 @@
         <dependency>
             <groupId>bwa</groupId>
             <artifactId>bwa</artifactId>
-            <version>0.6.2</version>
+            <version>0.7.6a</version>
             <classifier>compiled</classifier>
             <type>tar.gz</type>
         </dependency>
@@ -60,7 +60,7 @@
         <dependency>
             <groupId>picard</groupId>
             <artifactId>picard-tools</artifactId>
-            <version>1.89</version>
+            <version>1.105</version>
             <type>zip</type>
         </dependency>
         <dependency>

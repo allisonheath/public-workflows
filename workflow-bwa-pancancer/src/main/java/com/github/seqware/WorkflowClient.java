@@ -1,10 +1,13 @@
 package com.github.seqware;
 
 import ca.on.oicr.pde.utilities.workflows.OicrWorkflow;
+
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import net.sourceforge.seqware.pipeline.workflowV2.model.Command;
 import net.sourceforge.seqware.pipeline.workflowV2.model.Job;
 import net.sourceforge.seqware.pipeline.workflowV2.model.SqwFile;
 
@@ -43,6 +46,15 @@ public class WorkflowClient extends OicrWorkflow {
     String bwa_aln_params;
     String bwa_sampe_params;
     
+    private String picardMaxHeap;
+    private String maxMemory;
+    private String samtoolsVersion;
+    private String picardToolsVersion;
+    private String bwaNumberOfThreads;
+    private String referencePath;
+    
+    private static final String LOGS_DIRECTORY = "logs/";
+    
     @Override
     public Map<String, SqwFile> setupFiles() {
 
@@ -73,6 +85,13 @@ public class WorkflowClient extends OicrWorkflow {
             bwaSampeMemG = getProperty("bwaSampeMemG") == null ? "8" : getProperty("bwaSampeMemG");
             picardReadGrpMem = getProperty("picardReadGrpMem") == null ? "8" : getProperty("picardReadGrpMem");
             additionalPicardParams = getProperty("additionalPicardParams");
+            
+            setPicardMaxHeap(getProperty("picard_max_heap"));
+            setMaxMemory(getProperty("max_memory"));
+            setSamtoolsVersion(getProperty("samtools_version"));
+            setPicardToolsVersion(getProperty("picard_tools_version"));
+            setBwaNumberOfThreads(getProperty("bwa_num_threads"));
+            setReferencePath(getProperty("input_reference"));
 
 
         } catch (Exception e) {
@@ -87,6 +106,8 @@ public class WorkflowClient extends OicrWorkflow {
     public void setupDirectory() {
         // creates the final output 
         this.addDirectory(dataDir);
+        
+        this.addDirectory(LOGS_DIRECTORY);
     }
 
     @Override
@@ -107,77 +128,62 @@ public class WorkflowClient extends OicrWorkflow {
         for (int i=0; i<numBamFiles; i++) {
             
             String file = bamPaths.get(i);
-        
-            // BWA ALN STEPS
-            //bwa aln   -t 8 -b1 ./reference/genome.fa.gz ./HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam_000000.bam > aligned_1.sai 2> aligned_1.err
-            //bwa aln   -t 8 -b2 ./reference/genome.fa.gz ./HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam_000000.bam > aligned_2.sai 2> aligned_2.err
-            Job job01 = this.getWorkflow().createBashJob("bwa_align1_"+i);
-            job01.addParent(gtDownloadJob);
-            job01.getCommand().addArgument(this.getWorkflowBaseDir() + "/bin/bwa-0.6.2/bwa aln ")
-                    .addArgument(this.parameters("aln") == null ? " " : this.parameters("aln"))
-                    .addArgument(reference_path+" -b1 ")
-                    .addArgument(file)
-                    .addArgument(" > aligned_"+i+"_1.sai");
-            job01.setMaxMemory(bwaAlignMemG+"000");
-   
-            Job job02 = this.getWorkflow().createBashJob("bwa_align2_"+i);
-            job02.addParent(gtDownloadJob);
-            job02.getCommand().addArgument(this.getWorkflowBaseDir() + "/bin/bwa-0.6.2/bwa aln ")
-                    .addArgument(this.parameters("aln") == null ? " " : this.parameters("aln"))
-                    .addArgument(reference_path+" -b1 ")
-                    .addArgument(file)
-                    .addArgument(" > aligned_"+i+"_2.sai");
-            job02.setMaxMemory(bwaAlignMemG+"000");
             
-            // BWA SAMPE + CONVERT TO BAM
-            //bwa sampe reference/genome.fa.gz aligned_1.sai aligned_2.sai HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam_000000.bam HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam_000000.bam > aligned.sam
-            Job job03 = this.getWorkflow().createBashJob("bwa_sam_bam_"+i);
-            job03.getCommand().addArgument(this.getWorkflowBaseDir() + "/bin/bwa-0.6.2/bwa sampe ")
-            .addArgument(this.parameters("sampe").isEmpty() ? " " : this.parameters("sampe"))
-            .addArgument(reference_path)
-            .addArgument("aligned_"+i+"_1.sai")
-            .addArgument("aligned_"+i+"_2.sai")
-            .addArgument(file)
-            .addArgument(file)
-            .addArgument(" | java -Xmx"+bwaSampeMemG+"g -jar ")
-            .addArgument(this.getWorkflowBaseDir() + "/bin/picard-tools-1.89/SortSam.jar")
-            .addArgument("I=/dev/stdin TMP_DIR=./ VALIDATION_STRINGENCY=SILENT")
-            .addArgument("SORT_ORDER=coordinate CREATE_INDEX=true")
-            .addArgument("O=out_"+i+".bam");
-            job03.addParent(job01);
-            job03.addParent(job02);
-            job03.setMaxMemory(bwaSampeMemG+"000");
-            bamJobs.add(job03);        
-
-        }
-       
-        // MERGE AND READGROUPS
-        // add read groups and merge, will probably want to do this per bam above and just merge here with read groups to track... not sure if this will work properly
-	Job job04 = this.getWorkflow().createBashJob("addReadGroups");
-	job04.getCommand().addArgument("java -Xmx"+picardReadGrpMem+"g -jar "
-                + this.getWorkflowBaseDir() + "/bin/picard-tools-1.89/AddOrReplaceReadGroups.jar "
-                + " RGID=" + RGID
-                + " RGLB=" + RGLB
-                + " RGPL=" + RGPL
-                + " RGPU=" + RGPU
-                + " RGSM=" + RGSM
-                + " " + (additionalPicardParams.isEmpty() ? "" : additionalPicardParams));
-        for (int i=0; i<numBamFiles; i++) { job04.getCommand().addArgument(" I=out_"+i+".bam" ); }
-        job04.getCommand().addArgument(" O=" + this.dataDir + outputFileName + " >> "+this.dataDir+outputFileName + ".out 2>> "+this.dataDir+outputFileName +".err");
-	for (Job pJob : bamJobs) { 
-            System.err.println("DEBUG: "+pJob);
-            job04.addParent(pJob); 
-        }
-	job04.setMaxMemory(picardReadGrpMem+"000");
+            /* samtools view -u -h -f 1 ~/data/SRR062634.bam 2> /tmp/samtools_log.err | 
+             * java -Xmx2G -jar SamToFastq.jar INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=/tmp/ FASTQ=/dev/stdout QUIET=true 2> /tmp/samtofastq_log.err | 
+             * /usr/bin/bwa mem -p -M -T 0 -R '@RG\tID:SRR062634\tLB:2845856850\tSM:HG00096\tPI:206\tCN:WUGSC\tPL:ILLUMINA\tDS:SRP001294' -t 4 /Users/siakhnin/data/reference/genome.fa.gz 2> /tmp/bwa_log.err - | 
+             * java -Xmx2G -jar FixMateInformation.jar INPUT=/dev/stdin OUTPUT=sorted_test.bam SORT_ORDER=coordinate QUIET=true 2> /tmp/fixmate_log.err */
         
-        // PREPARE METADATA & UPLOAD
-        Job job05 = this.getWorkflow().createBashJob("upload");
-        job05.getCommand().addArgument("perl " + this.getWorkflowBaseDir() + "/scripts/upload_data.pl")
-                .addArgument("--bam "+this.dataDir + outputFileName)
-                .addArgument("--key "+gnosKey)
-                .addArgument("--url "+gnosUploadFileURL);
-        job05.addParent(job04);
-
+            String baseDir = this.getWorkflowBaseDir();
+            String samPath = baseDir + "/bin/samtools-" + getProperty("samtools-version") + "/";
+            String picardPath = baseDir + "/bin/picard-tools-" + getProperty("picard-tools-version") + "/";
+            
+            
+            Job myValidationJob = this.getWorkflow().createBashJob("bam_validation_" + i);
+            myValidationJob.addParent(gtDownloadJob);
+            myValidationJob.setMaxMemory(getMaxMemory());
+            
+            Command validationJobCommand = myValidationJob.getCommand();
+            validationJobCommand.addArgument("java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "ValidateSamFile.jar INPUT=" + file + " OUTPUT=" + LOGS_DIRECTORY + file + ".validation.log");
+            
+            Logger.getLogger(WorkflowClient.class.getName()).log(Level.INFO, null, validationJobCommand.toString());
+            
+            
+            Job myBwaJob = this.getWorkflow().createBashJob("bwa_mem_" + i);
+            myBwaJob.addParent(myValidationJob);
+            myBwaJob.setMaxMemory(getMaxMemory());
+            
+            Command bwaJobCommand = myBwaJob.getCommand();
+            
+            
+            //Samtools filters out unpaired reads -u = uncompressed, -h = with header, -f 1 = flag for paired reads
+            bwaJobCommand.addArgument(samPath + "samtools view ");
+            bwaJobCommand.addArgument(" -u -h -f 1 " + file + " 2> ./" + file + ".samtools.err ");
+            
+            //Picard SamToFastq
+            bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SamToFastq.jar");
+            bwaJobCommand.addArgument("INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=./ FASTQ=/dev/stdout QUIET=true 2> " + LOGS_DIRECTORY + file + ".samtofastq.err ");
+            
+            //BWA mem
+            bwaJobCommand.addArgument("| " + baseDir + "/bin/bwa mem ");
+            bwaJobCommand.addArgument("-p -M -T 0 -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> ." + LOGS_DIRECTORY + file + ".bwa.err - ");
+            
+            //Fix Mate Info and sort by coordinate
+            bwaJobCommand.addArgument("java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "FixMateInformation.jar ");
+            bwaJobCommand.addArgument("INPUT=/dev/stdin OUTPUT=" + dataDir + file + ".pcap.bam SORT_ORDER=coordinate QUIET=true 2> " + LOGS_DIRECTORY + file + ".fixmate.err ");
+            
+            
+            Logger.getLogger(WorkflowClient.class.getName()).log(Level.INFO, null, bwaJobCommand.toString());
+            
+            Job myUploadJob = this.getWorkflow().createBashJob("upload");
+            Command myUploadCommand = myUploadJob.getCommand();
+            myUploadCommand.addArgument("perl " + this.getWorkflowBaseDir() + "/scripts/upload_data.pl");
+            myUploadCommand.addArgument("--bam " + dataDir + file + ".pcap.bam");
+            myUploadCommand.addArgument("--key " + gnosKey);
+            myUploadCommand.addArgument("--url " + gnosUploadFileURL);
+            myUploadJob.addParent(myBwaJob);
+                      
+        }
     }
 
     public String parameters(final String setup) {
@@ -234,4 +240,52 @@ public class WorkflowClient extends OicrWorkflow {
         }
         return paramCommand;
     }
+
+	public String getPicardMaxHeap() {
+		return picardMaxHeap;
+	}
+
+	public void setPicardMaxHeap(String picardMaxHeap) {
+		this.picardMaxHeap = picardMaxHeap;
+	}
+
+	public String getMaxMemory() {
+		return maxMemory;
+	}
+
+	public void setMaxMemory(String maxMemory) {
+		this.maxMemory = maxMemory;
+	}
+
+	public String getSamtoolsVersion() {
+		return samtoolsVersion;
+	}
+
+	public void setSamtoolsVersion(String samtoolsVersion) {
+		this.samtoolsVersion = samtoolsVersion;
+	}
+
+	public String getPicardToolsVersion() {
+		return picardToolsVersion;
+	}
+
+	public void setPicardToolsVersion(String picardToolsVersion) {
+		this.picardToolsVersion = picardToolsVersion;
+	}
+
+	public String getBwaNumberOfThreads() {
+		return bwaNumberOfThreads;
+	}
+
+	public void setBwaNumberOfThreads(String bwaNumberOfThreads) {
+		this.bwaNumberOfThreads = bwaNumberOfThreads;
+	}
+
+	public String getReferencePath() {
+		return referencePath;
+	}
+
+	public void setReferencePath(String referencePath) {
+		this.referencePath = referencePath;
+	}
 }
