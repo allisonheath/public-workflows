@@ -135,8 +135,8 @@ public class WorkflowClient extends OicrWorkflow {
              * java -Xmx2G -jar FixMateInformation.jar INPUT=/dev/stdin OUTPUT=sorted_test.bam SORT_ORDER=coordinate QUIET=true 2> /tmp/fixmate_log.err */
         
             String baseDir = this.getWorkflowBaseDir();
-            String samPath = baseDir + "/bin/samtools-" + getProperty("samtools-version") + "/";
-            String picardPath = baseDir + "/bin/picard-tools-" + getProperty("picard-tools-version") + "/";
+            String samPath = baseDir + "/bin/samtools-" + getProperty("samtools_version") + "/";
+            String picardPath = baseDir + "/bin/picard-tools-" + getProperty("picard_tools_version") + "/";
             
             
             Job myValidationJob = this.getWorkflow().createBashJob("bam_validation_" + i);
