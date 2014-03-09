@@ -53,7 +53,7 @@ public class WorkflowClient extends OicrWorkflow {
     private String bwaNumberOfThreads;
     private String referencePath;
     
-    private static final String LOGS_DIRECTORY = "logs/";
+    private static final String LOGS_DIRECTORY = "../logs/";
     
     @Override
     public Map<String, SqwFile> setupFiles() {
@@ -112,7 +112,8 @@ public class WorkflowClient extends OicrWorkflow {
 
     @Override
     public void buildWorkflow() {
-        
+	setupDirectory();        
+ 
         ArrayList<Job> bamJobs = new ArrayList<Job>();
         
         // DOWNLOAD DATA
@@ -128,6 +129,7 @@ public class WorkflowClient extends OicrWorkflow {
         for (int i=0; i<numBamFiles; i++) {
             
             String file = bamPaths.get(i);
+	    String currentFileName = file.substring(file.lastIndexOf("/") + 1);
             
             /* samtools view -u -h -f 1 ~/data/SRR062634.bam 2> /tmp/samtools_log.err | 
              * java -Xmx2G -jar SamToFastq.jar INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=/tmp/ FASTQ=/dev/stdout QUIET=true 2> /tmp/samtofastq_log.err | 
@@ -144,7 +146,7 @@ public class WorkflowClient extends OicrWorkflow {
             myValidationJob.setMaxMemory(getMaxMemory());
             
             Command validationJobCommand = myValidationJob.getCommand();
-            validationJobCommand.addArgument("java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "ValidateSamFile.jar INPUT=" + file + " OUTPUT=" + LOGS_DIRECTORY + file + ".validation.log");
+            validationJobCommand.addArgument("java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "ValidateSamFile.jar INPUT=" + file + " OUTPUT=" + LOGS_DIRECTORY + currentFileName + ".validation.log");
             
             Logger.getLogger(WorkflowClient.class.getName()).log(Level.INFO, null, validationJobCommand.toString());
             
@@ -158,19 +160,19 @@ public class WorkflowClient extends OicrWorkflow {
             
             //Samtools filters out unpaired reads -u = uncompressed, -h = with header, -f 1 = flag for paired reads
             bwaJobCommand.addArgument(samPath + "samtools view ");
-            bwaJobCommand.addArgument(" -u -h -f 1 " + file + " 2> ./" + file + ".samtools.err ");
+            bwaJobCommand.addArgument(" -u -h -f 1 " + file + " 2> " + file + ".samtools.err ");
             
             //Picard SamToFastq
             bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SamToFastq.jar");
-            bwaJobCommand.addArgument("INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=./ FASTQ=/dev/stdout QUIET=true 2> " + LOGS_DIRECTORY + file + ".samtofastq.err ");
+            bwaJobCommand.addArgument("INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=./ FASTQ=/dev/stdout QUIET=true 2> " + LOGS_DIRECTORY + currentFileName + ".samtofastq.err ");
             
             //BWA mem
             bwaJobCommand.addArgument("| " + baseDir + "/bin/bwa mem ");
-            bwaJobCommand.addArgument("-p -M -T 0 -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> ." + LOGS_DIRECTORY + file + ".bwa.err - ");
+            bwaJobCommand.addArgument("-p -M -T 0 -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> ." + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
             
-            //Fix Mate Info and sort by coordinate
-            bwaJobCommand.addArgument("java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "FixMateInformation.jar ");
-            bwaJobCommand.addArgument("INPUT=/dev/stdin OUTPUT=" + dataDir + file + ".pcap.bam SORT_ORDER=coordinate QUIET=true 2> " + LOGS_DIRECTORY + file + ".fixmate.err ");
+            //Sort by coordinate
+            bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SortSam.jar ");
+            bwaJobCommand.addArgument("INPUT=/dev/stdin OUTPUT=" + dataDir + currentFileName + ".pcap.bam SORT_ORDER=coordinate QUIET=true 2> " + LOGS_DIRECTORY + currentFileName + ".sortsam.err ");
             
             
             Logger.getLogger(WorkflowClient.class.getName()).log(Level.INFO, null, bwaJobCommand.toString());
