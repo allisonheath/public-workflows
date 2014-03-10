@@ -140,18 +140,9 @@ public class WorkflowClient extends OicrWorkflow {
             String picardPath = baseDir + "/bin/picard-tools-" + getProperty("picard_tools_version") + "/";
             String bwaPath = baseDir + "/bin/bwa-" + getProperty("bwa_version") + "/";
             
-            Job myValidationJob = this.getWorkflow().createBashJob("bam_validation_" + i);
-            myValidationJob.addParent(gtDownloadJob);
-            myValidationJob.setMaxMemory(getMaxMemory());
-            
-            Command validationJobCommand = myValidationJob.getCommand();
-            validationJobCommand.addArgument("java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "ValidateSamFile.jar INPUT=" + file + " OUTPUT=" + LOGS_DIRECTORY + currentFileName + ".validation.log");
-            
-            Logger.getLogger(WorkflowClient.class.getName()).log(Level.INFO, null, validationJobCommand.toString());
-            
             
             Job myBwaJob = this.getWorkflow().createBashJob("bwa_mem_" + i);
-            myBwaJob.addParent(myValidationJob);
+            myBwaJob.addParent(gtDownloadJob);
             myBwaJob.setMaxMemory(getMaxMemory());
             
             Command bwaJobCommand = myBwaJob.getCommand();
@@ -168,7 +159,7 @@ public class WorkflowClient extends OicrWorkflow {
             
             //BWA mem
             bwaJobCommand.addArgument("| " + bwaPath + "bwa mem ");
-            bwaJobCommand.addArgument("-p -M -T 0 -R \"$MY_RG\" -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> " + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
+            bwaJobCommand.addArgument("-p -T 0 -R \"$MY_RG\" -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> " + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
             
             //Sort by coordinate
             bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SortSam.jar ");
