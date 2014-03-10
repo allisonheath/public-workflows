@@ -50,10 +50,11 @@ public class WorkflowClient extends OicrWorkflow {
     private String maxMemory;
     private String samtoolsVersion;
     private String picardToolsVersion;
+    private String bwaVersion;
     private String bwaNumberOfThreads;
     private String referencePath;
     
-    private static final String LOGS_DIRECTORY = "../logs/";
+    private static final String LOGS_DIRECTORY = "logs/";
     
     @Override
     public Map<String, SqwFile> setupFiles() {
@@ -93,7 +94,6 @@ public class WorkflowClient extends OicrWorkflow {
             setBwaNumberOfThreads(getProperty("bwa_num_threads"));
             setReferencePath(getProperty("input_reference"));
 
-
         } catch (Exception e) {
             Logger.getLogger(WorkflowClient.class.getName()).log(Level.SEVERE, null, e);
             System.exit(1);
@@ -112,7 +112,6 @@ public class WorkflowClient extends OicrWorkflow {
 
     @Override
     public void buildWorkflow() {
-	setupDirectory();        
  
         ArrayList<Job> bamJobs = new ArrayList<Job>();
         
@@ -139,7 +138,7 @@ public class WorkflowClient extends OicrWorkflow {
             String baseDir = this.getWorkflowBaseDir();
             String samPath = baseDir + "/bin/samtools-" + getProperty("samtools_version") + "/";
             String picardPath = baseDir + "/bin/picard-tools-" + getProperty("picard_tools_version") + "/";
-            
+            String bwaPath = baseDir + "/bin/bwa-" + getProperty("bwa_version") + "/";
             
             Job myValidationJob = this.getWorkflow().createBashJob("bam_validation_" + i);
             myValidationJob.addParent(gtDownloadJob);
@@ -162,13 +161,12 @@ public class WorkflowClient extends OicrWorkflow {
             bwaJobCommand.addArgument(samPath + "samtools view ");
             bwaJobCommand.addArgument(" -u -h -f 1 " + file + " 2> " + file + ".samtools.err ");
             
-            //Picard SamToFastq
-            bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SamToFastq.jar");
-            bwaJobCommand.addArgument("INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=./ FASTQ=/dev/stdout QUIET=true 2> " + LOGS_DIRECTORY + currentFileName + ".samtofastq.err ");
+            //Samtools bam2fq to convert to fastq
+            bwaJobCommand.addArgument("| " + samPath + "samtools bam2fq - ");
             
             //BWA mem
-            bwaJobCommand.addArgument("| " + baseDir + "/bin/bwa mem ");
-            bwaJobCommand.addArgument("-p -M -T 0 -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> ." + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
+            bwaJobCommand.addArgument("| " + bwaPath + "bwa mem ");
+            bwaJobCommand.addArgument("-p -M -T 0 -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> " + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
             
             //Sort by coordinate
             bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SortSam.jar ");
