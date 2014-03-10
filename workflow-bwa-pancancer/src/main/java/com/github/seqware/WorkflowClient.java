@@ -155,7 +155,9 @@ public class WorkflowClient extends OicrWorkflow {
             myBwaJob.setMaxMemory(getMaxMemory());
             
             Command bwaJobCommand = myBwaJob.getCommand();
-            
+
+            //Extract read group from original BAM file to pass to the new BAM file 
+            bwaJobCommand.addArgument("MY_RG=$(samtools view -H " + file + " | grep @RG | sed 's/\\s/\\\\t/g') \n");
             
             //Samtools filters out unpaired reads -u = uncompressed, -h = with header, -f 1 = flag for paired reads
             bwaJobCommand.addArgument(samPath + "samtools view ");
@@ -166,7 +168,7 @@ public class WorkflowClient extends OicrWorkflow {
             
             //BWA mem
             bwaJobCommand.addArgument("| " + bwaPath + "bwa mem ");
-            bwaJobCommand.addArgument("-p -M -T 0 -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> " + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
+            bwaJobCommand.addArgument("-p -M -T 0 -R \"$MY_RG\" -t " + getProperty("bwa_num_threads") + " " + getProperty("input_reference") + " 2> " + LOGS_DIRECTORY + currentFileName + ".bwa.err - ");
             
             //Sort by coordinate
             bwaJobCommand.addArgument("| java -Xmx" + getPicardMaxHeap() + " -jar " + picardPath + "SortSam.jar ");
