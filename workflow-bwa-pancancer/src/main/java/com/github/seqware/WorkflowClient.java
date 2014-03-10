@@ -148,7 +148,7 @@ public class WorkflowClient extends OicrWorkflow {
             Command bwaJobCommand = myBwaJob.getCommand();
 
             //Extract read group from original BAM file to pass to the new BAM file 
-            bwaJobCommand.addArgument("MY_RG=$(samtools view -H " + file + " | grep @RG | sed 's/\\s/\\\\t/g') \n");
+            bwaJobCommand.addArgument("MY_RG=$(" + samPath + "samtools view -H " + file + " | grep @RG | sed 's/\\s/\\\\t/g') \n");
             
             //Samtools filters out unpaired reads -u = uncompressed, -h = with header, -f 1 = flag for paired reads
             bwaJobCommand.addArgument(samPath + "samtools view ");
