@@ -214,14 +214,23 @@
                         <configuration>
                             <outputDirectory>${project.build.directory}/Workflow_Bundle_${workflow-directory-name}_${project.version}_SeqWare_${seqware-version}/Workflow_Bundle_${workflow-directory-name}/${project.version}</outputDirectory>
                             <resources>
+                           	 <resource>
+                                    <directory>workflow</directory>
+                                    <includes>
+                                        <include>metadata.xml</include>
+                                        <include>config/workflow.ini</include>
+                                        <include>workflows/workflow.ftl</include>
+                                    </includes>
+                                    <filtering>true</filtering>
+                                </resource>
                                 <resource>
                                     <directory>workflow</directory>
                                     <excludes>
-                                        <exclude>workflow.ftl</exclude>
-                                        <exclude>workflow.ini</exclude>
-                                        <exclude>**/bin/*</exclude>
-				    </excludes>
-                                    <filtering>true</filtering>
+                                        <exclude>metadata.xml</exclude>
+                                        <exclude>config/workflow.ini</exclude>
+                                        <exclude>workflows/workflow.ftl</exclude>
+                                    </excludes>
+                                    <filtering>false</filtering>
                                 </resource>
                             </resources>
                         </configuration>
