@@ -128,7 +128,7 @@ public class WorkflowClient extends OicrWorkflow {
         for (int i=0; i<numBamFiles; i++) {
             
             String file = bamPaths.get(i);
-	    String currentFileName = file.substring(file.lastIndexOf("/") + 1);
+            String currentFileName = file.substring(file.lastIndexOf("/") + 1);
             
             /* samtools view -u -h -f 1 ~/data/SRR062634.bam 2> /tmp/samtools_log.err | 
              * java -Xmx2G -jar SamToFastq.jar INPUT=/dev/stdin INTERLEAVE=true TMP_DIR=/tmp/ FASTQ=/dev/stdout QUIET=true 2> /tmp/samtofastq_log.err | 
